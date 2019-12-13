@@ -3,8 +3,10 @@
 pragma solidity 0.6.3;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 
 contract DEX {
+    using SafeMath for uint;
 
     enum Side { 
         BUY, 
@@ -75,7 +77,7 @@ contract DEX {
                 amount
             );
 
-            traderBalances[msg.sender][ticker] += amount;
+            traderBalances[msg.sender][ticker] = traderBalances[msg.sender][ticker].add(amount);
     }
 
     function withdraw(
@@ -85,7 +87,7 @@ contract DEX {
         external {
         require(traderBalances[msg.sender][ticker] >= amount, "balance too low");
 
-        traderBalances[msg.sender][ticker] -= amount;
+        traderBalances[msg.sender][ticker] = traderBalances[msg.sender][ticker].sub(amount);
         IERC20(tokens[ticker].tokenAddress).transfer(msg.sender, amount);
     }
 
@@ -104,7 +106,7 @@ contract DEX {
             );
         } else {
             require(
-                traderBalances[msg.sender][DAI] >= amount * price,
+                traderBalances[msg.sender][DAI] >= amount.mul(price),
                 "dai balance too low"
             );
         }
@@ -122,7 +124,7 @@ contract DEX {
             now
         ));
 
-        uint i = orders.length - 1;
+        uint i = orders.length >0 ? orders.length - 1 : 0;
         while (i > 0) {
             if (side == Side.BUY && orders[i - 1].price > orders[i].price) {
                 break;
@@ -133,9 +135,9 @@ contract DEX {
             Order memory orderToMove = orders[i - 1];
             orders[i - 1] = orders[i];
             orders[i] = orderToMove;
-            i--;
+            i.sub(1);
         }
-        nextOrderId++;
+        nextOrderId = nextOrderId.add(1);
     }
 
     function createMarketOrder(
@@ -158,11 +160,11 @@ contract DEX {
         uint remaining = amount;
 
         while(i < orders.length && remaining > 0) {
-            uint available = orders[i].amount - orders[i].filled;
+            uint available = orders[i].amount.sub(orders[i].filled);
             uint matched = (remaining > available) ? available : remaining;
 
-            remaining -= matched;
-            orders[i].filled += matched;
+            remaining = remaining.sub(matched);
+            orders[i].filled = orders[i].filled.add(matched);
 
             emit NewTrade(
                 nextTradeId,
@@ -176,27 +178,27 @@ contract DEX {
             );
 
             if (side == Side.SELL) {
-                traderBalances[msg.sender][ticker] -= matched;
-                traderBalances[msg.sender][DAI] += matched * orders[i].price;
+                traderBalances[msg.sender][ticker] = traderBalances[msg.sender][ticker].sub(matched);
+                traderBalances[msg.sender][DAI] = traderBalances[msg.sender][DAI].add(matched.mul(orders[i].price));
                 
-                traderBalances[orders[i].trader][ticker] += matched;
-                traderBalances[orders[i].trader][DAI] -= matched * orders[i].price;
+                traderBalances[orders[i].trader][ticker] = traderBalances[orders[i].trader][ticker].add(matched);
+                traderBalances[orders[i].trader][DAI] = traderBalances[orders[i].trader][DAI].sub(matched.mul(orders[i].price));
             } 
 
             if (side == Side.BUY) {
                 require(
-                    traderBalances[msg.sender][DAI] >= matched * orders[i].price,
+                    traderBalances[msg.sender][DAI] >= matched.mul(orders[i].price),
                     "dai balance too low"
                 );
 
-                traderBalances[msg.sender][ticker] += matched;
-                traderBalances[msg.sender][DAI] -= matched * orders[i].price;
+                traderBalances[msg.sender][ticker] = traderBalances[msg.sender][ticker].add(matched);
+                traderBalances[msg.sender][DAI] = traderBalances[msg.sender][DAI].sub(matched.mul(orders[i].price));
                 
-                traderBalances[orders[i].trader][ticker] -= matched;
-                traderBalances[orders[i].trader][DAI] += matched * orders[i].price;
+                traderBalances[orders[i].trader][ticker] = traderBalances[orders[i].trader][ticker].sub(matched);
+                traderBalances[orders[i].trader][DAI] = traderBalances[orders[i].trader][DAI].add(matched.mul(orders[i].price));
             }
-            nextTradeId++;
-            i++;
+            nextTradeId = nextTradeId.add(1);
+            i = i.add(1);
         }
 
         i = 0;
@@ -205,7 +207,7 @@ contract DEX {
                 orders[j] = orders[j + 1];
             }
             orders.pop();
-            i++;
+            i = i.add(1);
         }
     }
 
