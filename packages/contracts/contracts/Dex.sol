@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: MIT 
 
 pragma solidity 0.6.3;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
@@ -55,6 +56,29 @@ contract DEX {
 
     constructor() public {
         admin = msg.sender;
+    }
+
+    function getOrders(
+        bytes32 ticker, 
+        Side side) 
+        external 
+        view
+        returns(Order[] memory) {
+        return orderBook[ticker][uint(side)];
+    } 
+
+    function getTokens() 
+      external 
+      view 
+      returns(Token[] memory) {
+      Token[] memory _tokens = new Token[](tokenList.length);
+      for (uint i = 0; i < tokenList.length; i++) {
+        _tokens[i] = Token(
+          tokens[tokenList[i]].ticker,
+          tokens[tokenList[i]].tokenAddress
+        );
+      }
+      return _tokens;
     }
 
     function addToken(
